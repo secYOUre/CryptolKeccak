@@ -1,0 +1,52 @@
+/* LFSR implementation */
+type LFSRState =  {state : [9]; result : Bit};
+
+LFSR86540 : [9] -> LFSRState;
+LFSR86540(State) = if (State & 0x01 != 0) then ({state=State'; result=True })
+                                          else ({state=State'; result=False} )
+  where {
+    State' = LFSR86540_Update(State);
+  };
+
+LFSR86540_Update(State) = if (State & 0x80 != 0) then (
+      /*
+       * Cryptol support polynomial arithmetic over polynomial with
+       * binary coefficients. Keccak make use of a primitive
+       * polynomial over GF(2). Here we specify the polynomial term
+       * inside <| |> brakets and mask the result with 0xff in order
+       * to have a byte-wide state.
+       */
+      ((State << 1) ^ <| x^8 + x^6 + x^5 + x^4 + 1 |>) & 0xff
+    ) else (
+      State << 1
+    );
+
+nextShiftIndex : [2][1][16] -> [2][1][16];
+nextShiftIndex(prevIndex) = [[x] [y]]
+  where {
+     [[a] [b]] = mmult([[0 1][2 3]], prevIndex);
+     x = a % 5; y = b % 5;
+  };
+
+/*
+ * nextPiIndex : [2][1][16] -> [2][1][16];
+ * nextPiIndex(prevIndex) = [[x] [y]]
+ *  where {
+ *     [[a] [b]] = mmult([[3 (-1)][(-2) 0]], prevIndex);
+ *     x = a % 5; y = b % 5;
+ *  };
+ */
+
+
+/* iterateLFSR : {a}(fin a) => [9] -> [169]LFSRState; */
+iterateLFSR(x) = nr
+  where {
+        outs = [ {state = x; result = True; }  ] #
+                     [|  LFSR86540(((prev) : LFSRState ).state)
+
+                     || i <- [0..23], j <- [0..6]
+                     || prev <- outs
+                     |];
+
+        nr = drop(1, outs);
+  };

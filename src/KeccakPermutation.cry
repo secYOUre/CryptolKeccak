@@ -1,0 +1,200 @@
+??? from here until ???END lines may have been inserted/deleted
+/*
+ * Keccak-f implementation in Cryptol
+ * 
+ * Copyright (c) 2010 - Alfonso De Gregorio adg@crypto.lo.gy
+ *
+ * run with: KeccakRound(State, Rounds)
+ * example:  KeccakRound(A, nrRounds - 1)
+ *
+ */
+
+include "KeccakRhoOffsets.cry"
+include "KeccakRoundConstants.cry"
+include "LFSR86540.cry"
+include "mmult.cry";
+include "util.cry";
+
+
+type nrWords  = 25;
+nrRounds  = 24;
+
+/**
+ * The step mappings of Keccak-f
+ *
+ * A Keccak-f round is composed from a sequence of dedicated mappings,
+ * each one with its particular task operating on a state array of 
+ * 5 x 5 lanes. All allowed lane lengths are powers of two - 
+ * w  {1, 2, 4, 8, 16, 32, 64} (b = 25w); hence shorter lanes divides 
+ * longer lane lengths. As "the propagation structures for smaller 
+ * versions are embedded as symmetric structure in larger width version"
+ * the authors call it a Matryoshka structure.
+ * 
+ * Round[b](A, RC)
+ *    step theta
+ *    step rho and pi
+ *    step chi
+ *    step iota
+ * return A
+ *
+ * With the exception of iota, all step mappings of the Keccak-f round
+ * function are translation-invariant in the direction of the z axis. 
+ */
+ 
+/* Theta linear mapping - transposed input */
+thetaT : [5][5][8][8] -> [5][5][8][8];
+thetaT (tA) = A'
+  where {
+
+  /* Theta */
+  A = transpose(tA);
+
+  /* 
+   * Over higher-dimensional sequences the exclusive-or operates 
+   * element-wise. Here the innermost elements are lanes. They are 
+   * processed in sheets by accessing the permutation state array 
+   * via the index operator.
+   */
+   C = (A @ 0) ^ (A @ 1) ^ (A @ 2) ^ (A @ 3) ^ (A @ 4);    
+
+  /* Rotate left by 1 each lane in C */
+  D = [] # [| splitBy(8, join(C @ x) <<< 1)
+           || x <- [0..4]
+           |];
+
+  /* The pivot needs explicit typing, otherwise some index evaluations
+   * would fail. For instance, x + 4 % 5 = 0, where x is 4 */
+  A' = [| [| (A @ y @ x) ^ 
+             (D @ (((x : [8]) + 1) % 5)) ^ 
+             (C @ (((x : [8]) + 4) % 5))
+          || y  <- [0..4] 
+          |]
+       || x <- [0..4]
+       |];
+
+  };
+
+
+/* Rho step */
+rho : [5][5][8][8] -> [5][5][8][8];
+rho (A) = A'
+  where {
+    A' = [| [| splitBy(8, join(A @ x @ y) <<< (KeccakRhoOffsets @ x @ y))
+            || y <- [0..4]
+            |]
+         || x <- [0..4]
+         |];
+  };
+
+
+
+/* Pi step */
+
+piLookupIndex =
+[[[0x0 0x0] [0x3 0x0] [0x1 0x0] [0x4 0x0] [0x2 0x0]]
+ [[0x1 0x1] [0x4 0x1] [0x2 0x1] [0x0 0x1] [0x3 0x1]]
+ [[0x2 0x2] [0x0 0x2] [0x3 0x2] [0x1 0x2] [0x4 0x2]]
+ [[0x3 0x3] [0x1 0x3] [0x4 0x3] [0x2 0x3] [0x0 0x3]]
+ [[0x4 0x4] [0x2 0x4] [0x0 0x4] [0x3 0x4] [0x1 0x4]]];
+
+pi : [5][5][8][8];
+pi (A) = A'
+  where {
+    S = [] # [| (A @ x @ y) 
+             ||  [x y] <- join(piLookupIndex)
+             |];
+    A' = groupBy(5, S);
+  };
+
+
+
+/* Chi mapping */
+chi : [5][5][8][8] -> [5][5][8][8];
+
+/* Arithmetic in Cryptol is modulo the size of the word.
+ * Here we need to explicitly make sure the cursors stay 
+ * in range 
+ */
+chi (A) = [| [| (A @ x @ y) ^ 
+               ((~(A @ ((x+1)%5) @ y )) & (A @ ((x+2)%5) @ y))
+             || y <- [0..4]
+             |]
+          || x <- [0..4]
+          |];
+
+
+/* Iota step */
+iota : ([5][5][8][8], [8]) -> [5][5][8][8];
+
+/**
+ * With the step , Keccak aims at disrupting symmetries that could be 
+ * exploited by attackers. At each round round-constants are taken from
+ * the ouput of a maximum-length LFSR and added to the state array.
+ *
+ * RC = (x^t mod x^8 + x^6+ x^5 + x^4 + 1) mod x in GF(2)[x]
+ *
+ * A[0, 0] = A[0, 0] + RC
+ */
+
+iota (A, indexRound) = A'
+  where {
+     S  = repl(A@0, 0, (A@0@0) ^ 
+                       splitBy(8,(KeccakRoundConstants@indexRound))) 
+        # A @ 1
+        # A @ 2
+        # A @ 3
+        # A @ 4;
+     A' = groupBy(5, S);
+  };
+
+
+
+/* Keccak-f - the round function */
+
+KeccakRound : ([5][5][8][8], [8]) -> [5][5][8][8];
+KeccakRound(A, round) = iota(chi(pi(rho(thetaT(A)))), round);
+
+
+
+KeccakAbsorb1024bits(S, Data) = KeccakPermutationAfterXor(S, take(16, Data));
+KeccakAbsorb1088bits(S, Data) = KeccakPermutationAfterXor(S, take(17, Data));
+KeccakAbsorb1152bits(S, Data) = KeccakPermutationAfterXor(S, take(18, Data));
+KeccakAbsorb832bits(S, Data) = KeccakPermutationAfterXor(S, take(13, Data));
+KeccakAbsorb576bits(S, Data) = KeccakPermutationAfterXor(S, take(9, Data));
+
+/* laneCount parameter dropped, just run KeccakPermutationAfterXor
+ * on all data and let the caller build a new list by dropping according
+ * the current laneCount */
+KeccakAbsorb : {a} (200 >= a, fin a) => ([200][8], [a][8]) -> [200][8];
+KeccakAbsorb(S, Data) = KeccakPermutationAfterXor(S, Data);
+
+KeccakPermutationAfterXor : {a} (200 >= a, fin a) => ([200][8], [a][8]) -> [200][8];
+KeccakPermutationAfterXor(S, Data) = S''
+  where {
+        S'  = (take(width(Data), S) ^ Data) # drop(width(Data), S);
+	S'' = KeccakPermutation(S');
+        /* S'  = nextState(S, width(zero:[stateMsg]), join(A')); */
+  };
+
+KeccakExtract1024bits(S) = take(128, S);
+KeccakExtract1088bits(S) = take(136, S);
+KeccakExtract1152bits(S) = take(144, S);
+KeccakExtract832bits(S) = take(104, S);
+KeccakExtract576bits(S) = take(72, S);
+
+
+KeccakPermutation(S) = S'
+  where {
+    A' = KeccakPermutationOnWords(groupBy(5, groupBy(8, S)));
+    S' = join(join(A'));
+
+  };
+
+KeccakPermutationOnWords(A) = rounds @ 24
+   where { 
+     rounds = [A] # [| KeccakRound(state, roundnr) 
+                    || state <- rounds
+                    || roundnr <- [0..(nrRounds-1)]
+                    |];
+   };
+

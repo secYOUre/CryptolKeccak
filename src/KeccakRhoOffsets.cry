@@ -1,0 +1,45 @@
+/* Compute Keccak Rho constants */
+
+iterateShiftIndex : [2][1][16] -> [24][2][1][16];
+iterateShiftIndex x = outs
+  where outs = [x] # [| nextShiftIndex prev
+                     || i <- [0..22]
+                     || prev <- outs
+                     |];
+
+nextShiftIndex : [2][1][16] -> [2][1][16];
+nextShiftIndex(prevIndex) = [[x] [y]]
+  where {
+     [[a] [b]] = mmult([[0 1][2 3]], prevIndex);
+     x = a % 5; y = b % 5;
+  };
+
+
+KeccakInitializeRhoOffsets = O
+  where {
+     KeccakRhoOffsets : [25][64];
+     KeccakRhoOffsets = [
+          0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ];
+
+     shiftOffsets = ts;
+
+     shiftIndexes = iterateShiftIndex [[1] [0]];
+
+
+     W = [ KeccakRhoOffsets ] # [| repl(prev, 5 * x + y, offset)
+                                ||    offset <- shiftOffsets
+                                || [[x] [y]] <- shiftIndexes
+                                ||      prev <- W
+                                |];
+
+     O = groupBy(5, W @ 24);
+  };
+
+KeccakRhoOffsets : [5][5][64];
+KeccakRhoOffsets = [
+[0x0000000000000000 0x0000000000000024 0x0000000000000003 0x0000000000000069 0x00000000000000d2]
+ [0x0000000000000001 0x000000000000012c 0x000000000000000a 0x000000000000002d 0x0000000000000042]
+ [0x00000000000000be 0x0000000000000006 0x00000000000000ab 0x000000000000000f 0x00000000000000fd]
+ [0x000000000000001c 0x0000000000000037 0x0000000000000099 0x0000000000000015 0x0000000000000078]
+ [0x000000000000005b 0x0000000000000114 0x00000000000000e7 0x0000000000000088 0x000000000000004e]];
+

@@ -1,0 +1,53 @@
+/* Compute the Keccak round constants and make them available precomputed */
+
+include "LFSR86540.cry"
+
+KeccakInitializeState : [5][5][8][8];
+KeccakInitializeState = [| [| splitBy(8, 0 : [64]) || y <- [0..4] |] || x <- [0.
+.4] |];
+
+KeccakInitializeRoundConstants : [24][64];
+KeccakInitializeRoundConstants = Constants
+  where {
+    KeccakRoundConstants : [24][64];
+    KeccakRoundConstants = splitBy(24, 0 : [1536]);
+
+    W  = [ KeccakRoundConstants ] #
+         [| if ((state : LFSRState).result) then
+               repl(prev, i, (prev @ i) ^ (1<<((1<<j) - 1)))
+            else
+               prev
+         || i <- [0..23],  j <- [0..6]
+         || prev <- W
+         || state <- iterateLFSR 0x01
+         |];
+
+    Constants = W @ 168;
+  };
+
+KeccakRoundConstants : [24][64];
+KeccakRoundConstants =
+   [ 0x0000000000000001
+     0x0000000000008082
+     0x800000000000808a
+     0x8000000080008000
+     0x000000000000808b
+     0x0000000080000001
+     0x8000000080008081
+     0x8000000000008009
+     0x000000000000008a
+     0x0000000000000088
+     0x0000000080008009
+     0x000000008000000a
+     0x000000008000808b
+     0x800000000000008b
+     0x8000000000008089
+     0x8000000000008003
+     0x8000000000008002
+     0x8000000000000080
+     0x000000000000800a
+     0x800000008000000a
+     0x8000000080008081
+     0x8000000000008080
+     0x0000000080000001
+     0x8000000080008008 ];

@@ -1,0 +1,5 @@
+/* Replace an element in a sequence */
+repl (xs, i, y) = [| if k == i then y else x
+                  || k <- [0.. (width xs)]
+                  || x <- xs
+                  |];
