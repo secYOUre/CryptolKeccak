@@ -1,0 +1,56 @@
+A Cryptol Implementation of Keccak
+==================================
+
+Copyright (c) 2010 - Alfonso De Gregorio <adg@crypto.lo.gy>, secYOUre by
+SecurityPillar Ltd.
+
+Please, make sure to check out the article at - a snipped is provided below:
+http://plaintext.crypto.lo.gy/article/495/untwisted-a-cryptol-implementation-of-keccak-part-1
+
+------------------------------------------------------------------------
+
+A Cryptol Implementation of Keccak: 
+The Matryoshka and the Hermetic Sponge Strategy
+
+Introduction
+
+In the last Untwisted issue, we explored how to bitslice a cryptographic algorithm, writing a vectorized TEA implementation in C. This time we will play with Cryptol, digging into the elegant design of Keccak, a candidate to the SHA-3 cryptographic hash algorithm competition. This will provide us the opportunity to learn more about the Cryptol specification language and see how its expressive power matches the purity and the clearness of the Keccak's reference specification.
+
+Cryptol
+
+Cryptol is a purely functional domain specific language, developed over the past decade by Galois for the NSA, for the design, implementation and verification of cryptographic algorithms. As announced by Galois:
+
+Cryptol allows a cryptographer to:
+
+Create a reference specification and associated formal model.
+Quickly refine the specification, in Cryptol, to one or more implementations, trading off space, time, and other performance metrics.
+Compile the implementation for multiple targets, including: C/C++, Haskell, and VHDL/Verilog.
+Equivalence check an implementation against the reference specification, including implementations not produced by Cryptol.
+With its features set, Cryptol can significantly contribute towards meeting the challenges arising from the integration of cryptographic components into hardware and software systems, such as: their test and verification, the unambiguous specification of algorithms, and the retargeting of cryptographic implementations to new platforms.
+
+The relationship between languages and information security has a long and interesting lineage. Martin Abadi reminds us how "objects and types have long been used for protection against incompetence and malice, at least since the 1970s". Distributed systems sometimes benefited fromabstractions for communication on secure channels provided by programming languages. Cryptol strenghten this relationship in the cryptographic setting.
+
+ 
+
+Keccak
+
+Keccak is a family of cryptographic hash functions or, more accurately, sponge functions, designed by Guido Bertoni, Joan Daemen, Gilles Van Assche (STMicrosystems) and Michal Peeters (NXP Semiconductors).
+
+With a construction based on a permutation f from a set of 7 permutations that should not have any structural distinguishers, Keccak provides provable security against all generic attacks and is one of the five finalists in the NIST's SHA-3 cryptographic hash algorithm competition,
+
+Any instance of the Keccak sponge function family makes use of one of the seven Keccak-f permutations, denoted Keccak-f[b], where b  {25, 50, 100, 200, 400, 800, 1600} is the width of the permutation. These Keccak-f permutations are iterated constructions consisting of a sequence of almost identical rounds. The number of rounds nr depends on the permutation width, and is given by nr = 12 + 2l, where 2^l = b/25. This gives 24 rounds for Keccak-f[1600].
+
+In pseudo code:
+
+  Keccak-f[b](A)
+    for i in 0 ... nr - 1
+      A = Round[b](A, RC[i])
+    return A
+All Keccak members proposed for SHA-3 standardization make use of the same permutation: Keccak-f[1600].
+
+Let's implement Keccak-f in Cryptol, starting from giving a representation to its permutation state.
+
+...
+
+For more:
+http://plaintext.crypto.lo.gy/article/495/untwisted-a-cryptol-implementation-of-keccak-part-1
