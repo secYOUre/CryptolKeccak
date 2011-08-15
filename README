@@ -4,7 +4,7 @@ A Cryptol Implementation of Keccak
 Copyright (c) 2010 - Alfonso De Gregorio <adg@crypto.lo.gy>, secYOUre by
 SecurityPillar Ltd.
 
-Please, make sure to check out the article at - a snipped is provided below:
+Please, make sure to check out the article at - a snippet is provided below:
 http://plaintext.crypto.lo.gy/article/495/untwisted-a-cryptol-implementation-of-keccak-part-1
 
 ------------------------------------------------------------------------
